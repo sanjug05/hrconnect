@@ -226,6 +226,19 @@ select.ic option{background:var(--PD);color:#fff;}
   }
   .cfoot,-webkit-print-color-adjust:exact;print-color-adjust:exact;
 }
+
+/* ── Birthday Multiple – sidebar person blocks ── */
+#grpBdayPersons{display:flex;flex-direction:column;gap:10px;}
+.bp-block{background:rgba(255,255,255,.04);border:1px solid rgba(184,138,45,.22);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+.bp-hd{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--GL);}
+.bp-photo-wrap{position:relative;width:100%;height:70px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(184,138,45,.3);border-radius:8px;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,.3);transition:.2s;}
+.bp-photo-wrap:hover{border-color:var(--G);color:var(--G);}
+.bp-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;}
+.bp-photo-wrap.has-img .bp-img{display:block;}
+.bp-photo-wrap.has-img .bp-placeholder{display:none;}
+.bp-upload-input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;}
+.bp-clear{position:absolute;top:4px;right:4px;background:rgba(231,76,60,.88);color:#fff;border:none;border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:10px;display:none;align-items:center;justify-content:center;z-index:3;line-height:1;padding:0;}
+.bp-photo-wrap.has-img .bp-clear{display:flex;}
 </style>
 </head>
 <body>
@@ -341,6 +354,19 @@ select.ic option{background:var(--PD);color:#fff;}
       <label for="fYrs">Years Completed</label>
       <input type="number" id="fYrs" class="ic" min="1" max="50" value="1">
     </div>
+
+    <!-- Birthday Multiple (birthday occasion only) -->
+    <div class="fgrp" id="grpBdayMult" style="display:none">
+      <label for="fBdayMult"><i class="fas fa-users" style="font-size:9px;margin-right:4px"></i>Birthday Multiple</label>
+      <select class="ic" id="fBdayMult">
+        <option value="1">Single Birthday</option>
+        <option value="2">2 Birthdays</option>
+        <option value="3">3 Birthdays</option>
+        <option value="4">4 Birthdays</option>
+        <option value="5">5 Birthdays</option>
+      </select>
+    </div>
+    <div id="grpBdayPersons"></div>
 
     <!-- Recipient -->
     <div class="fgrp">
@@ -1346,13 +1372,16 @@ const togHist = document.getElementById('togHist');
 const histChev= document.getElementById('histChev');
 const hlist   = document.getElementById('hlist');
 const btnClrH = document.getElementById('btnClrHist');
+const fBdayMult   = document.getElementById('fBdayMult');
+const grpBdayMult = document.getElementById('grpBdayMult');
 
 let history_  = JSON.parse(localStorage.getItem('hrc_hist') || '[]');
 let savedNames= JSON.parse(localStorage.getItem('hrc_names') || '[]');
 let logoB64      = localStorage.getItem('hrc_logo') || '';
-let logoDirectSrc= '';   // direct file path when base64 unavailable (file:// CORS taint)
+let logoDirectSrc= '';
 let toastTmr     = null;
 let html2cvLoaded = false;
+const bdayPhotoData = {}; // keyed 0-4, value: { src: base64string }
 
 /* ── helpers ── */
 function san(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
@@ -1450,8 +1479,217 @@ document.querySelectorAll('.tdot').forEach(dot => {
 /* ── Occasion change ── */
 fOcc.onchange = () => {
   grpYrs.style.display = fOcc.value === 'workAnniversary' ? 'flex' : 'none';
+  const isBday = fOcc.value === 'birthday';
+  grpBdayMult.style.display = isBday ? 'flex' : 'none';
+  if (isBday) {
+    buildBdayPersonFields(parseInt(fBdayMult.value) || 1);
+  } else {
+    fBdayMult.value = '1';
+    buildBdayPersonFields(0);
+  }
 };
 fName.oninput = () => { ctrEl.textContent = fName.value.length + ' / 40'; };
+
+/* ── Birthday Multiple – field builder ── */
+fBdayMult.onchange = () => {
+  const count = parseInt(fBdayMult.value) || 1;
+  buildBdayPersonFields(count);
+};
+
+function buildBdayPersonFields(count) {
+  const container = document.getElementById('grpBdayPersons');
+  container.innerHTML = '';
+  if (count === 0) { container.style.display = 'none'; return; }
+  container.style.display = 'flex';
+  // Clear photo data for slots beyond count
+  for (let k in bdayPhotoData) { if (parseInt(k) >= count) delete bdayPhotoData[k]; }
+  for (let i = 0; i < count; i++) {
+    const hasImg = !!(bdayPhotoData[i] && bdayPhotoData[i].src);
+    const block = document.createElement('div');
+    block.className = 'bp-block';
+    if (count === 1) {
+      // Single birthday — photo only (name is already in Recipient Name field)
+      block.innerHTML = `
+        <div class="bp-hd"><i class="fas fa-id-badge" style="font-size:8px;margin-right:5px"></i>Birthday Person Photo <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.45">(optional · personalises the card)</span></div>
+        <div class="bp-photo-wrap${hasImg?' has-img':''}" id="bdayWrap0">
+          <span class="bp-placeholder" style="display:flex;align-items:center;gap:6px;font-size:11px;pointer-events:none"><i class="fas fa-user-circle" style="font-size:13px"></i>Upload photo to personalise card</span>
+          <img class="bp-img" id="bdayImg0" src="${hasImg?bdayPhotoData[0].src:''}" alt="">
+          <input type="file" class="bp-upload-input" accept="image/*" data-idx="0">
+          <button type="button" class="bp-clear" data-idx="0" title="Remove photo">✕</button>
+        </div>`;
+    } else {
+      // 2–5 birthdays — name + photo per person
+      block.innerHTML = `
+        <div class="bp-hd"><i class="fas fa-user" style="font-size:8px;margin-right:5px"></i>Person ${i+1}</div>
+        <input type="text" class="ic" id="bdayName${i}" placeholder="Name…" maxlength="30" autocomplete="off" style="padding:7px 11px;font-size:12px" value="">
+        <div class="bp-photo-wrap${hasImg?' has-img':''}" id="bdayWrap${i}">
+          <span class="bp-placeholder" style="display:flex;align-items:center;gap:5px;font-size:11px;pointer-events:none"><i class="fas fa-camera" style="font-size:9px"></i>Upload Photo</span>
+          <img class="bp-img" id="bdayImg${i}" src="${hasImg?bdayPhotoData[i].src:''}" alt="">
+          <input type="file" class="bp-upload-input" accept="image/*" data-idx="${i}">
+          <button type="button" class="bp-clear" data-idx="${i}" title="Remove photo">✕</button>
+        </div>`;
+    }
+    // File upload
+    block.querySelector('.bp-upload-input').addEventListener('change', function(e) {
+      const f = e.target.files[0];
+      if (!f) return;
+      if (!f.type.startsWith('image/')) { toast_('Please select an image file.', true); return; }
+      if (f.size > 4 * 1024 * 1024) { toast_('Photo too large (max 4 MB).', true); return; }
+      const idx = parseInt(this.dataset.idx);
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const src = ev.target.result;
+        if (!bdayPhotoData[idx]) bdayPhotoData[idx] = {};
+        bdayPhotoData[idx].src = src;
+        const imgEl = document.getElementById('bdayImg' + idx);
+        const wrapEl = document.getElementById('bdayWrap' + idx);
+        if (imgEl) imgEl.src = src;
+        if (wrapEl) wrapEl.classList.add('has-img');
+      };
+      reader.readAsDataURL(f);
+    });
+    // Clear button
+    block.querySelector('.bp-clear').addEventListener('click', function(e) {
+      e.preventDefault(); e.stopPropagation();
+      const idx = parseInt(this.dataset.idx);
+      if (bdayPhotoData[idx]) delete bdayPhotoData[idx].src;
+      const imgEl = document.getElementById('bdayImg' + idx);
+      const wrapEl = document.getElementById('bdayWrap' + idx);
+      const fi = wrapEl ? wrapEl.querySelector('.bp-upload-input') : null;
+      if (imgEl) imgEl.src = '';
+      if (wrapEl) wrapEl.classList.remove('has-img');
+      if (fi) fi.value = '';
+    });
+    container.appendChild(block);
+  }
+}
+
+function getBdayPersons(count) {
+  const persons = [];
+  for (let i = 0; i < count; i++) {
+    const nameEl = document.getElementById('bdayName' + i);
+    const name = nameEl ? (nameEl.value.trim() || ('Team Member ' + (i+1))) : ('Team Member ' + (i+1));
+    const imgSrc = (bdayPhotoData[i] && bdayPhotoData[i].src) ? bdayPhotoData[i].src : '';
+    persons.push({ name, imgSrc });
+  }
+  return persons;
+}
+
+/* ── Multi-birthday card renderer ── */
+function renderMultiBdayCard(persons, fromText, msgText, logoSrc) {
+  const count = persons.length;
+  const year  = new Date().getFullYear();
+
+  const logoHTML = logoSrc
+    ? `<img src="${logoSrc}" alt="Company Logo" style="height:50px;width:auto;max-width:120px;object-fit:contain;display:block;">`
+    : `<div style="font-family:'Playfair Display',serif;font-size:15px;color:#d4a843;letter-spacing:1px;">HR Connect</div>`;
+
+  function initials(name) {
+    return (name||'TM').split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  }
+
+  function photoCell(p, sz) {
+    const nm  = san(p.name || 'Team Member');
+    const ini = initials(p.name || 'TM');
+    const ring = sz + 10;
+    const inner = p.imgSrc
+      ? `<img src="${p.imgSrc}" style="width:${sz}px;height:${sz}px;object-fit:cover;border-radius:50%;display:block;" alt="${nm}">`
+      : `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:linear-gradient(135deg,rgba(184,138,45,.28) 0%,rgba(11,61,46,.65) 100%);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:${Math.round(sz*0.28)}px;color:#d4a843;font-weight:700;">${ini}</div>`;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;">
+      <div style="width:${ring}px;height:${ring}px;border-radius:50%;border:2.5px solid #b88a2d;padding:2px;background:rgba(184,138,45,.06);display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(184,138,45,.22);">
+        ${inner}
+      </div>
+      <div style="font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;color:#fff;text-align:center;max-width:${ring+16}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">${nm}</div>
+    </div>`;
+  }
+
+  // Grid layouts per count
+  let photoGrid = '';
+  if (count === 2) {
+    photoGrid = `<div style="display:flex;gap:48px;align-items:flex-start;justify-content:center;">${persons.map(p=>photoCell(p,116)).join('')}</div>`;
+  } else if (count === 3) {
+    photoGrid = `<div style="display:flex;gap:32px;align-items:flex-start;justify-content:center;">${persons.map(p=>photoCell(p,102)).join('')}</div>`;
+  } else if (count === 4) {
+    const cells = persons.map(p=>photoCell(p,96)).join('');
+    photoGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 48px;justify-items:center;">${cells}</div>`;
+  } else {
+    // 5: top row 3, bottom row 2 centred
+    const top = persons.slice(0,3).map(p=>photoCell(p,86)).join('');
+    const bot = persons.slice(3).map(p=>photoCell(p,86)).join('');
+    photoGrid = `<div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
+      <div style="display:flex;gap:22px;align-items:flex-start;justify-content:center;">${top}</div>
+      <div style="display:flex;gap:22px;align-items:flex-start;justify-content:center;">${bot}</div>
+    </div>`;
+  }
+
+  const defaultMsg = `Warmest birthday wishes to all our incredible team members celebrating their special day today. Your dedication, energy, and spirit make our workplace truly exceptional — keep shining bright!`;
+  const msg = msgText || defaultMsg;
+
+  // Background SVG (decorative layer)
+  const bgSvg = `<svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;" viewBox="0 0 720 500" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="mbd_bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#0a1628"/><stop offset="55%" stop-color="#0B3D2E"/><stop offset="100%" stop-color="#082d22"/>
+      </linearGradient>
+      <radialGradient id="mbd_glow" cx="50%" cy="38%" r="45%">
+        <stop offset="0%" stop-color="rgba(184,138,45,.09)"/><stop offset="100%" stop-color="rgba(184,138,45,0)"/>
+      </radialGradient>
+    </defs>
+    <rect width="720" height="500" fill="url(#mbd_bg)"/>
+    <rect width="720" height="500" fill="url(#mbd_glow)"/>
+    <path d="M0,0 L52,0 L52,3 L3,3 L3,52 L0,52 Z" fill="rgba(184,138,45,.45)"/>
+    <path d="M720,0 L668,0 L668,3 L717,3 L717,52 L720,52 Z" fill="rgba(184,138,45,.45)"/>
+    <path d="M0,500 L52,500 L52,497 L3,497 L3,448 L0,448 Z" fill="rgba(184,138,45,.45)"/>
+    <path d="M720,500 L668,500 L668,497 L717,497 L717,448 L720,448 Z" fill="rgba(184,138,45,.45)"/>
+    <rect x="66" y="94" width="7" height="7" rx="1.5" fill="rgba(255,235,59,.28)" transform="rotate(28 69 97)"/>
+    <rect x="636" y="74" width="8" height="8" rx="1.5" fill="rgba(255,182,193,.22)" transform="rotate(-18 640 78)"/>
+    <rect x="106" y="388" width="6" height="6" rx="1" fill="rgba(135,206,250,.2)" transform="rotate(44 109 391)"/>
+    <rect x="596" y="402" width="7" height="7" rx="1.5" fill="rgba(255,235,59,.2)" transform="rotate(14 599 405)"/>
+    <circle cx="42" cy="202" r="3" fill="rgba(255,255,255,.055)"/>
+    <circle cx="678" cy="258" r="4" fill="rgba(255,255,255,.055)"/>
+    <circle cx="66" cy="446" r="2.5" fill="rgba(184,138,45,.18)"/>
+    <circle cx="652" cy="156" r="3" fill="rgba(184,138,45,.16)"/>
+    <ellipse cx="360" cy="422" rx="210" ry="14" fill="rgba(184,138,45,.04)"/>
+  </svg>`;
+
+  return `<div id="card" data-multi-bday="true"
+    style="width:min(720px,100%);height:500px;position:relative;overflow:hidden;
+      border:2.5px solid #b88a2d;border-radius:6px;
+      box-shadow:var(--shadow);outline:2px solid rgba(184,138,45,.18);outline-offset:4px;
+      display:flex;flex-direction:column;background:#0a1628;color:#fff;">
+    ${bgSvg}
+    <!-- Header -->
+    <div style="position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:12px 24px 10px;border-bottom:1px solid rgba(184,138,45,.28);background:rgba(0,0,0,.2);flex-shrink:0;">
+      ${logoHTML}
+      <div style="text-align:right;">
+        <div style="font-family:'Playfair Display',serif;font-size:21px;color:#d4a843;letter-spacing:.5px;line-height:1.2;">Birthday Celebrations</div>
+        <div style="font-size:8px;letter-spacing:2.5px;color:rgba(212,168,67,.52);text-transform:uppercase;margin-top:3px;">People &amp; Culture · AIS Windows</div>
+        <div style="height:2px;width:42px;background:linear-gradient(90deg,transparent,#b88a2d);margin-top:5px;margin-left:auto;"></div>
+      </div>
+    </div>
+    <!-- Photo grid -->
+    <div style="position:relative;z-index:2;flex:1;display:flex;align-items:center;justify-content:center;padding:14px 24px 6px;">
+      ${photoGrid}
+    </div>
+    <!-- Message + sender -->
+    <div style="position:relative;z-index:2;padding:8px 28px 10px;border-top:1px solid rgba(184,138,45,.18);flex-shrink:0;">
+      <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;line-height:1.52;color:rgba(255,255,255,.72);margin-bottom:8px;">${san(msg)}</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#b88a2d;text-transform:uppercase;letter-spacing:.8px;">${san(fromText)}</div>
+          <div style="font-size:8px;color:rgba(255,255,255,.27);letter-spacing:.4px;margin-top:1px;">AIS WINDOWS · ASAHI INDIA GLASS LTD.</div>
+        </div>
+        <div style="width:54px;height:54px;border:2px solid #b88a2d;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;transform:rotate(-12deg);background:rgba(0,0,0,.25);flex-shrink:0;">
+          <div style="font-size:6px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#b88a2d;line-height:1.38;">${year}<br>✦<br>HR<br>Connect</div>
+        </div>
+      </div>
+    </div>
+    <!-- Footer -->
+    <div style="position:relative;z-index:2;background:#0a1628;color:#b88a2d;padding:6px 20px;text-align:center;font-size:9px;letter-spacing:2px;font-weight:500;border-top:1.5px solid #b88a2d;flex-shrink:0;">
+      Excellence in Every Detail &nbsp;·&nbsp; Since 1987
+    </div>
+  </div>`;
+}
 
 /* ── Saved names ── */
 function renderChips(){
@@ -1513,7 +1751,10 @@ window._loadHist = i => {
   const item = history_[i];
   fOcc.value = item.occ; fName.value = item.name; fFrom.value = item.from;
   fTone.value = item.tone; fMsg.value = item.customMsg || '';
-  fYrs.value = item.years || 1; fOcc.onchange(); fName.oninput();
+  fYrs.value = item.years || 1;
+  // Reset birthday multiple to single on history load
+  if (fBdayMult) { fBdayMult.value = '1'; buildBdayPersonFields(0); }
+  fOcc.onchange(); fName.oninput();
   generateCard(true);
 };
 
@@ -1537,12 +1778,33 @@ function generateCard(isReload=false){
   const yrs  = Math.min(50, Math.max(1, parseInt(fYrs.value)||1));
   const tmpl = T[occ] || T.birthday;
 
+  /* ── Multi-birthday mode ── */
+  if (occ === 'birthday' && fBdayMult && fBdayMult.value !== '1') {
+    const count   = parseInt(fBdayMult.value) || 2;
+    const persons = getBdayPersons(count);
+    const logoSrc = logoB64 || logoDirectSrc;
+    stage.innerHTML = renderMultiBdayCard(persons, from, cMsg, logoSrc);
+    btnPNG.disabled = false; btnClip.disabled = false; btnPrint.disabled = false;
+    if (!isReload) {
+      const nameTag = persons.map(p=>p.name).join(', ');
+      saveHist({ occ, name: nameTag, from, tone, customMsg: cMsg, years: yrs, tag: 'Birthday Celebrations' });
+    }
+    return;
+  }
+
   let title = tmpl.title.replace(/<span>/g,'<span style="color:#b88a2d">');
   if(occ === 'workAnniversary'){
     title = `Celebrating <span style="color:#b88a2d">${yrs} ${yrs===1?'Year':'Years'}</span> of Excellence`;
   }
   const msg = cMsg || tmpl['msg'+tone] || tmpl.msgFormal;
   const visual = getVisual(occ);
+
+  // Single birthday: use uploaded photo as the left panel if available
+  const singleBdayPhoto = (occ === 'birthday' && bdayPhotoData[0] && bdayPhotoData[0].src)
+    ? bdayPhotoData[0].src : null;
+  const visualContent = singleBdayPhoto
+    ? `<img src="${singleBdayPhoto}" style="width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;">`
+    : visual;
 
   const year = new Date().getFullYear();
   const logoSrc = logoB64 || logoDirectSrc;
@@ -1552,7 +1814,7 @@ function generateCard(isReload=false){
 
   stage.innerHTML = `
   <div id="card">
-    <div class="cv">${visual}<div class="cv-ov"></div></div>
+    <div class="cv">${visualContent}<div class="cv-ov"></div></div>
     <div class="cc">
       <div class="chr">
         ${logoHTML}
@@ -1625,10 +1887,11 @@ async function renderToCanvas(){
   });
 
   const clone = card.cloneNode(true);
+  const isMultiBday = clone.dataset.multiBday === 'true';
   Object.assign(clone.style,{
     width:W+'px', height:H+'px', minWidth:W+'px', maxWidth:W+'px',
     minHeight:H+'px', maxHeight:H+'px',
-    display:'flex', flexDirection:'row', borderRadius:'0',
+    display:'flex', flexDirection: isMultiBday ? 'column' : 'row', borderRadius:'0',
     boxShadow:'none', animation:'none', transition:'none', flex:'none',
     overflow:'hidden', position:'relative', border:'none', outline:'none',
   });
@@ -1714,12 +1977,20 @@ btnPrint.onclick = () => {
 
 /* ── WhatsApp ── */
 btnWA.onclick = () => {
-  const name    = (fName.value || 'Team Member').trim();
+  const isMultiBday = fOcc.value === 'birthday' && fBdayMult && fBdayMult.value !== '1';
   const tone    = fTone.value;
   const occText = fOcc.options[fOcc.selectedIndex]?.text || 'Special Occasion';
   const tmpl    = T[fOcc.value] || T.birthday;
-  const msgBody = fMsg.value.trim() || tmpl['msg'+tone] || tmpl.msgFormal;
-  let txt = `🎉 *${occText} – HR Connect*\n\nDear *${name}*,\n\n${msgBody}\n\n— ${fFrom.value||'People & Culture Team'}\nAIS Windows | HR Connect`;
+  let recipient = (fName.value || 'Team Member').trim();
+  let msgBody   = fMsg.value.trim() || tmpl['msg'+tone] || tmpl.msgFormal;
+  if (isMultiBday) {
+    const count = parseInt(fBdayMult.value) || 2;
+    const persons = getBdayPersons(count);
+    const names = persons.map(p=>p.name).filter(n=>n && !n.startsWith('Team Member'));
+    if (names.length) recipient = names.join(', ');
+    if (!fMsg.value.trim()) msgBody = `Warmest birthday wishes to all our incredible team members celebrating their special day today. Your dedication and spirit make our workplace truly exceptional — keep shining!`;
+  }
+  const txt = `🎉 *${occText} – HR Connect*\n\nDear *${recipient}*,\n\n${msgBody}\n\n— ${fFrom.value||'People & Culture Team'}\nAIS Windows | HR Connect`;
   window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
 };
 
