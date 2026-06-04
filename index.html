@@ -1508,9 +1508,10 @@ function buildBdayPersonFields(count) {
     const block = document.createElement('div');
     block.className = 'bp-block';
     if (count === 1) {
-      // Single birthday — photo only (name is already in Recipient Name field)
+      // Single birthday — dept + photo (name comes from Recipient Name field above)
       block.innerHTML = `
-        <div class="bp-hd"><i class="fas fa-id-badge" style="font-size:8px;margin-right:5px"></i>Birthday Person Photo <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.45">(optional · personalises the card)</span></div>
+        <div class="bp-hd"><i class="fas fa-id-badge" style="font-size:8px;margin-right:5px"></i>Birthday Person Details <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.45">(optional · personalises the card)</span></div>
+        <input type="text" class="ic" id="bdayDept0" placeholder="Department  e.g. Finance, Operations…" maxlength="40" autocomplete="off" style="padding:7px 11px;font-size:12px" value="${(bdayPhotoData[0]&&bdayPhotoData[0].dept)||''}">
         <div class="bp-photo-wrap${hasImg?' has-img':''}" id="bdayWrap0">
           <span class="bp-placeholder" style="display:flex;align-items:center;gap:6px;font-size:11px;pointer-events:none"><i class="fas fa-user-circle" style="font-size:13px"></i>Upload photo to personalise card</span>
           <img class="bp-img" id="bdayImg0" src="${hasImg?bdayPhotoData[0].src:''}" alt="">
@@ -1518,10 +1519,11 @@ function buildBdayPersonFields(count) {
           <button type="button" class="bp-clear" data-idx="0" title="Remove photo">✕</button>
         </div>`;
     } else {
-      // 2–5 birthdays — name + photo per person
+      // 2–5 birthdays — name + dept + photo per person
       block.innerHTML = `
         <div class="bp-hd"><i class="fas fa-user" style="font-size:8px;margin-right:5px"></i>Person ${i+1}</div>
-        <input type="text" class="ic" id="bdayName${i}" placeholder="Name…" maxlength="30" autocomplete="off" style="padding:7px 11px;font-size:12px" value="">
+        <input type="text" class="ic" id="bdayName${i}" placeholder="Name…" maxlength="30" autocomplete="off" style="padding:7px 11px;font-size:12px" value="${(bdayPhotoData[i]&&bdayPhotoData[i].name)||''}">
+        <input type="text" class="ic" id="bdayDept${i}" placeholder="Department  e.g. Finance, Operations…" maxlength="40" autocomplete="off" style="padding:6px 11px;font-size:11px;color:rgba(255,255,255,.7)" value="${(bdayPhotoData[i]&&bdayPhotoData[i].dept)||''}">
         <div class="bp-photo-wrap${hasImg?' has-img':''}" id="bdayWrap${i}">
           <span class="bp-placeholder" style="display:flex;align-items:center;gap:5px;font-size:11px;pointer-events:none"><i class="fas fa-camera" style="font-size:9px"></i>Upload Photo</span>
           <img class="bp-img" id="bdayImg${i}" src="${hasImg?bdayPhotoData[i].src:''}" alt="">
@@ -1548,6 +1550,17 @@ function buildBdayPersonFields(count) {
       };
       reader.readAsDataURL(f);
     });
+    // Persist name & dept on input so values survive count switches
+    const nameInp = block.querySelector(`#bdayName${i}`);
+    if (nameInp) nameInp.addEventListener('input', function() {
+      if (!bdayPhotoData[i]) bdayPhotoData[i] = {};
+      bdayPhotoData[i].name = this.value;
+    });
+    const deptInp = block.querySelector(`#bdayDept${i}`);
+    if (deptInp) deptInp.addEventListener('input', function() {
+      if (!bdayPhotoData[i]) bdayPhotoData[i] = {};
+      bdayPhotoData[i].dept = this.value;
+    });
     // Clear button
     block.querySelector('.bp-clear').addEventListener('click', function(e) {
       e.preventDefault(); e.stopPropagation();
@@ -1568,9 +1581,11 @@ function getBdayPersons(count) {
   const persons = [];
   for (let i = 0; i < count; i++) {
     const nameEl = document.getElementById('bdayName' + i);
+    const deptEl = document.getElementById('bdayDept' + i);
     const name = nameEl ? (nameEl.value.trim() || ('Team Member ' + (i+1))) : ('Team Member ' + (i+1));
+    const dept = deptEl ? deptEl.value.trim() : ((bdayPhotoData[i] && bdayPhotoData[i].dept) || '');
     const imgSrc = (bdayPhotoData[i] && bdayPhotoData[i].src) ? bdayPhotoData[i].src : '';
-    persons.push({ name, imgSrc });
+    persons.push({ name, dept, imgSrc });
   }
   return persons;
 }
@@ -1592,14 +1607,18 @@ function renderMultiBdayCard(persons, fromText, msgText, logoSrc) {
     const nm  = san(p.name || 'Team Member');
     const ini = initials(p.name || 'TM');
     const ring = sz + 10;
+    const deptLine = p.dept
+      ? `<div style="font-size:8px;color:rgba(212,168,67,.72);text-align:center;max-width:${ring+14}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.4px;font-style:italic;margin-top:-1px;">${san(p.dept)}</div>`
+      : '';
     const inner = p.imgSrc
       ? `<img src="${p.imgSrc}" style="width:${sz}px;height:${sz}px;object-fit:cover;border-radius:50%;display:block;" alt="${nm}">`
       : `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:linear-gradient(135deg,rgba(184,138,45,.28) 0%,rgba(11,61,46,.65) 100%);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:${Math.round(sz*0.28)}px;color:#d4a843;font-weight:700;">${ini}</div>`;
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;">
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;">
       <div style="width:${ring}px;height:${ring}px;border-radius:50%;border:2.5px solid #b88a2d;padding:2px;background:rgba(184,138,45,.06);display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(184,138,45,.22);">
         ${inner}
       </div>
       <div style="font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;color:#fff;text-align:center;max-width:${ring+16}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">${nm}</div>
+      ${deptLine}
     </div>`;
   }
 
@@ -1806,6 +1825,14 @@ function generateCard(isReload=false){
     ? `<img src="${singleBdayPhoto}" style="width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;">`
     : visual;
 
+  // Single birthday dept label
+  const singleBdayDept = occ === 'birthday'
+    ? (() => { const el = document.getElementById('bdayDept0'); return el ? el.value.trim() : ''; })()
+    : '';
+  const deptBadge = singleBdayDept
+    ? `<div style="display:inline-block;font-size:10px;font-weight:600;color:#6d9e6b;letter-spacing:.7px;font-style:italic;margin-top:-2px;margin-bottom:5px;">${san(singleBdayDept)}</div>`
+    : '';
+
   const year = new Date().getFullYear();
   const logoSrc = logoB64 || logoDirectSrc;
   const logoHTML = logoSrc
@@ -1823,6 +1850,7 @@ function generateCard(isReload=false){
       <div>
         <div class="ctag">${san(tmpl.tag)}</div>
         <div class="crcp">Dear ${san(name)},</div>
+        ${deptBadge}
         <h1 class="ctitle">${title}</h1>
         <p class="cmsg">${san(msg)}</p>
       </div>
