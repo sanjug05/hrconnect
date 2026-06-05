@@ -1591,7 +1591,7 @@ function getBdayPersons(count) {
 }
 
 /* ── Multi-birthday card renderer ── */
-function renderMultiBdayCard(persons, fromText, msgText, logoSrc) {
+function renderMultiBdayCard(persons, fromText, msgText, logoSrc, tone) {
   const count = persons.length;
   const year  = new Date().getFullYear();
 
@@ -1641,7 +1641,12 @@ function renderMultiBdayCard(persons, fromText, msgText, logoSrc) {
     </div>`;
   }
 
-  const defaultMsg = `Warmest birthday wishes to all our incredible team members celebrating their special day today. Your dedication, energy, and spirit make our workplace truly exceptional — keep shining bright!`;
+  const defaultMsgs = {
+    Formal:      'On behalf of our People & Culture team, we extend warmest birthday wishes to all our exceptional colleagues celebrating today. Your dedication and professionalism inspire us every day.',
+    Warm:        'Happy Birthday to all our amazing birthday stars! We are so grateful for each of you — your warmth, energy and spirit make our workplace truly extraordinary. Wishing you a wonderful day!',
+    Celebratory: 'It\'s celebration time! Wishing all our incredible birthday stars a day as brilliant and joyful as they are. You make every day vibrant, exciting and unforgettable — cheers to you all! 🎉'
+  };
+  const defaultMsg = defaultMsgs[tone] || defaultMsgs.Formal;
   const msg = msgText || defaultMsg;
 
   // Background SVG (decorative layer)
@@ -1802,7 +1807,7 @@ function generateCard(isReload=false){
     const count   = parseInt(fBdayMult.value) || 2;
     const persons = getBdayPersons(count);
     const logoSrc = logoB64 || logoDirectSrc;
-    stage.innerHTML = renderMultiBdayCard(persons, from, cMsg, logoSrc);
+    stage.innerHTML = renderMultiBdayCard(persons, from, cMsg, logoSrc, tone);
     btnPNG.disabled = false; btnClip.disabled = false; btnPrint.disabled = false;
     if (!isReload) {
       const nameTag = persons.map(p=>p.name).join(', ');
