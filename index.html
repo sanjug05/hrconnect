@@ -162,6 +162,23 @@ select.ic option{background:var(--PD);color:#fff;}
 .cele-meta{font-size:10px;color:rgba(255,255,255,.5);margin-top:1px;}
 .cele-when{font-size:9px;font-weight:700;color:var(--GL);text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;}
 .cele-when.today{color:#5fe08a;}
+/* daily celebrations briefing modal */
+.bf-overlay{position:fixed;inset:0;background:rgba(5,16,12,.72);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;animation:fadeIn .2s var(--ease);}
+.bf-overlay.on{display:flex;}
+.bf-modal{background:linear-gradient(160deg,#0f3328,var(--PD));border:1px solid rgba(184,138,45,.4);border-radius:16px;box-shadow:0 30px 80px -20px rgba(0,0,0,.7);width:100%;max-width:430px;max-height:86vh;overflow:hidden;display:flex;flex-direction:column;position:relative;animation:bfPop .28s var(--ease);}
+@keyframes bfPop{from{transform:translateY(14px) scale(.97);opacity:0;}to{transform:none;opacity:1;}}
+.bf-x{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.6);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;transition:.2s;z-index:2;}
+.bf-x:hover{background:rgba(255,255,255,.16);color:#fff;}
+.bf-head{display:flex;align-items:center;gap:13px;padding:22px 48px 14px 22px;flex-shrink:0;}
+.bf-ic{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--G),var(--GL));display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--PD);flex-shrink:0;}
+.bf-title{font-family:'Playfair Display',serif;font-size:19px;color:#fff;line-height:1.12;}
+.bf-sub{font-size:10px;color:var(--GL);letter-spacing:.6px;text-transform:uppercase;margin-top:3px;}
+.bf-body{padding:2px 18px 6px;overflow-y:auto;}
+.bf-seclbl{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--GL);margin:13px 4px 8px;display:flex;align-items:center;gap:7px;}
+.bf-seclbl .pill{background:rgba(184,138,45,.2);padding:1px 8px;border-radius:20px;font-size:9px;color:#fff;}
+.bf-foot{padding:13px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid rgba(184,138,45,.15);margin-top:6px;flex-shrink:0;}
+.bf-chk{font-size:11px;color:rgba(255,255,255,.6);display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;}
+.bf-chk input{width:14px;height:14px;accent-color:var(--G);cursor:pointer;}
 .ros-list{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(184,138,45,.3) transparent;}
 .ros-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border-radius:7px;padding:6px 9px;font-size:11.5px;}
 .ros-item .ri-name{flex:1;font-weight:600;color:#fff;}
@@ -602,6 +619,24 @@ select.ic option{background:var(--PD);color:#fff;}
   <p id="loaderMsg">PREPARING DESIGN…</p>
 </div>
 <div class="toast" id="toast"></div>
+
+<div class="bf-overlay" id="bfOverlay">
+  <div class="bf-modal" id="bfModal" role="dialog" aria-modal="true">
+    <button class="bf-x" id="bfClose" title="Close"><i class="fas fa-times"></i></button>
+    <div class="bf-head">
+      <div class="bf-ic"><i class="fas fa-bell"></i></div>
+      <div>
+        <div class="bf-title">Celebrations Today &amp; Tomorrow</div>
+        <div class="bf-sub" id="bfDate"></div>
+      </div>
+    </div>
+    <div class="bf-body" id="bfBody"></div>
+    <div class="bf-foot">
+      <label class="bf-chk"><input type="checkbox" id="bfSnooze"> Don't show again today</label>
+      <button class="btn btn-s sm" id="bfGotit" style="padding:8px 18px;">Got it</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -2405,6 +2440,50 @@ window.addEventListener('resize', debounce(fitPreview,120));
 /* ========================================================
    INIT
    ======================================================== */
+/* ========================================================
+   DAILY CELEBRATIONS BRIEFING (popup on open)
+   ======================================================== */
+function briefingRows(list, startIdx){
+  return list.map((c,k)=>{
+    const idx=startIdx+k;
+    const icon=c.type==='bday'?'fa-cake-candles':'fa-briefcase';
+    const meta=c.type==='bday' ? 'Birthday' : (c.years>0 ? (c.years+(c.years===1?' year':' years')+' anniversary') : 'Work anniversary');
+    return `<div class="cele ${c.type==='bday'?'bday':''}" data-bf="${idx}" title="Tap to create this card">
+      <div class="cele-ic"><i class="fas ${icon}"></i></div>
+      <div class="cele-body"><div class="cele-name">${san(c.person.name||'—')}</div><div class="cele-meta">${san(meta)} · ${fmtShortDate(c.date)}</div></div>
+      <div class="cele-when ${c.daysUntil===0?'today':''}">${c.daysUntil===0?'Today':'Tomorrow'}</div>
+    </div>`;
+  }).join('');
+}
+function closeBriefing(){
+  const sn=$('bfSnooze');
+  if(sn && sn.checked) LS.set('hrc_brief_snooze', todayStr());
+  const ov=$('bfOverlay'); if(ov) ov.classList.remove('on');
+}
+function showDailyBriefing(force){
+  const ov=$('bfOverlay'); if(!ov) return;
+  if(!force && LS.get('hrc_brief_snooze')===todayStr()) return;
+  const all=getCelebrations(1);
+  const today=all.filter(c=>c.daysUntil===0);
+  const tomorrow=all.filter(c=>c.daysUntil===1);
+  if(!today.length && !tomorrow.length) return;
+  const combined=today.concat(tomorrow);
+  let html='';
+  if(today.length) html+=`<div class="bf-seclbl"><i class="fas fa-star" style="color:#5fe08a"></i> Today <span class="pill">${today.length}</span></div>`+briefingRows(today,0);
+  if(tomorrow.length) html+=`<div class="bf-seclbl"><i class="far fa-clock"></i> Tomorrow <span class="pill">${tomorrow.length}</span></div>`+briefingRows(tomorrow,today.length);
+  const body=$('bfBody'); body.innerHTML=html;
+  [].forEach.call(body.querySelectorAll('[data-bf]'),el=> el.onclick=()=>{ const c=combined[+el.dataset.bf]; closeBriefing(); if(c) generateFromCelebration(c); });
+  const d=$('bfDate'); if(d) d.textContent=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+  ov.classList.add('on');
+}
+(function(){
+  const ov=$('bfOverlay'), x=$('bfClose'), ok=$('bfGotit');
+  if(x) x.onclick=closeBriefing;
+  if(ok) ok.onclick=closeBriefing;
+  if(ov) ov.addEventListener('click', e=>{ if(e.target===ov) closeBriefing(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && ov && ov.classList.contains('on')) closeBriefing(); });
+})();
+
 function init(){
   applyTheme();
   setFormat(currentFormat);
@@ -2416,6 +2495,7 @@ function init(){
   renderChips(); renderRoster(); renderCelebrations(); renderHist();
   updateCounter();
   renderPreview();
+  setTimeout(showDailyBriefing, 350);
 }
 init();
 
