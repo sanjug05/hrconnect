@@ -53,6 +53,11 @@ body{font-family:'Montserrat',sans-serif;background:var(--app-bg);color:#fff;min
 .seg{display:flex;gap:6px;}
 .seg-btn{flex:1;padding:9px 8px;border:1px solid rgba(184,138,45,.3);background:rgba(255,255,255,.04);color:rgba(255,255,255,.6);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:.4px;border-radius:8px;cursor:pointer;transition:.2s var(--ease);display:flex;align-items:center;justify-content:center;gap:6px;}
 .seg-btn.on{background:var(--G);color:var(--PD);border-color:var(--G);}
+.rng{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;background:rgba(184,138,45,.28);outline:none;margin-top:6px;cursor:pointer;}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;border-radius:50%;background:var(--G);cursor:pointer;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
+.rng::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--G);cursor:pointer;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
+.csv-hint{font-size:10px;line-height:1.6;color:rgba(255,255,255,.62);margin-top:8px;padding:9px 11px;background:rgba(184,138,45,.08);border-left:2px solid rgba(184,138,45,.5);border-radius:5px;}
+.csv-hint b{color:var(--GL);font-weight:600;}
 .panel{display:none;flex-direction:column;gap:15px;animation:fadeIn .25s var(--ease);}
 .panel.on{display:flex;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
@@ -433,6 +438,11 @@ select.ic option{background:var(--PD);color:#fff;}
         </div>
       </div>
 
+      <div class="fgrp" id="grpPhotoSize" style="display:none">
+        <label><i class="fas fa-up-right-and-down-left-from-center" style="font-size:9px;margin-right:4px"></i>Photo Size <span class="hint" id="psizeVal">115%</span></label>
+        <input type="range" id="fPhotoSize" class="rng" min="0.8" max="1.6" step="0.05" value="1.15">
+      </div>
+
       <div class="fgrp">
         <label>Recipient Name</label>
         <div class="nrow">
@@ -495,6 +505,11 @@ select.ic option{background:var(--PD);color:#fff;}
         <button class="btn btn-ghost sm" id="btnImportRos"><i class="fas fa-file-csv"></i> Import CSV</button>
         <button class="btn btn-ghost sm" id="btnExportRos"><i class="fas fa-download"></i> Export CSV</button>
         <input type="file" id="rosFile" accept=".csv,text/csv" style="display:none">
+      </div>
+      <button class="btn btn-ghost sm" id="btnSampleRos" style="width:100%;margin-top:8px;border-style:dashed;color:var(--GL);"><i class="fas fa-file-arrow-down"></i> Download Sample CSV Template</button>
+      <div class="csv-hint">
+        <b>Columns:</b> Name &middot; Department &middot; DOB &middot; Joining&nbsp;Date &nbsp;—&nbsp; dates as <b>1990-08-15</b> or <b>15/08/1990</b>.<br>
+        New to this? Tap <b>Download Sample CSV Template</b>, fill it in Excel, then <b>Import CSV</b>.
       </div>
 
       <div>
@@ -1522,6 +1537,7 @@ let currentFormat = LS.get('hrc_fmt') || 'landscape';
 let currentTheme  = LS.get('hrc_theme') || '1';
 let accentColor   = LS.get('hrc_accent') || '';
 let photoShape    = LS.get('hrc_pshape') || 'circle';
+let photoScale    = parseFloat(LS.get('hrc_pscale')) || 1.15;
 let toastTmr = null, html2cvLoaded = false, previewTmr = null;
 const bdayPhotoData = {};               // {0..4}: {src,name,dept}
 if(!FMT_OK(currentFormat)) currentFormat = 'landscape';
@@ -1664,6 +1680,7 @@ function collectState(){
     singleDept: (occ==='birthday') ? singleBdayDept() : '',
     singlePhoto: (occ==='birthday') ? singleBdayPhoto() : '',
     photoShape: photoShape,
+    photoScale: photoScale,
   };
 }
 
@@ -1805,15 +1822,16 @@ function birthdayDecor(W,H){
       <ellipse cx="${(cx-r*0.32).toFixed(1)}" cy="${(cy-r*0.42).toFixed(1)}" rx="${(r*0.26).toFixed(1)}" ry="${(r*0.4).toFixed(1)}" fill="${hl}" opacity=".55"/>
       <path d="M${(cx-r*0.16).toFixed(1)} ${(cy+r*1.16).toFixed(1)} l ${(r*0.16).toFixed(1)} ${(r*0.2).toFixed(1)} l ${(r*0.16).toFixed(1)} -${(r*0.2).toFixed(1)} z" fill="${c}"/>
     </g>`;
-  // bunting across the top
+  // bunting — slim garland pinned to the very top edge, kept clear of the header below it
   const cols=['#ff6f91','#54b9ac','#e7b13c','#9b8bd6','#ff9a5a'];
-  let bunting='', flags=Math.max(7, Math.round(W/64)), gap=W/flags;
-  bunting+=`<path d="M0 ${(H*0.045).toFixed(1)} Q ${(W/2).toFixed(1)} ${(H*0.095).toFixed(1)} ${W} ${(H*0.045).toFixed(1)}" stroke="rgba(150,110,60,.4)" stroke-width="1.2" fill="none"/>`;
+  let bunting='', flags=Math.max(8, Math.round(W/56)), gap=W/flags;
+  const stringY=15, dipY=26, flagH=Math.min(22, gap*0.55);
+  bunting+=`<path d="M0 ${stringY} Q ${(W/2).toFixed(1)} ${dipY} ${W} ${stringY}" stroke="rgba(150,110,60,.4)" stroke-width="1.2" fill="none"/>`;
   for(let i=0;i<flags;i++){
     const t=(i+0.5)/flags, x=t*W;
-    const y=H*0.045 + Math.sin(Math.PI*t)*H*0.05;
-    const w=gap*0.62;
-    bunting+=`<path d="M${(x-w/2).toFixed(1)} ${y.toFixed(1)} L${(x+w/2).toFixed(1)} ${y.toFixed(1)} L${x.toFixed(1)} ${(y+gap*0.6).toFixed(1)} Z" fill="${cols[i%cols.length]}" opacity=".8"/>`;
+    const y=stringY + Math.sin(Math.PI*t)*(dipY-stringY);
+    const w=gap*0.6;
+    bunting+=`<path d="M${(x-w/2).toFixed(1)} ${y.toFixed(1)} L${(x+w/2).toFixed(1)} ${y.toFixed(1)} L${x.toFixed(1)} ${(y+flagH).toFixed(1)} Z" fill="${cols[i%cols.length]}" opacity=".82"/>`;
   }
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;z-index:0;">
     <defs><radialGradient id="bdGlow" cx="50%" cy="44%" r="58%">
@@ -1823,9 +1841,9 @@ function birthdayDecor(W,H){
     </radialGradient></defs>
     <rect width="${W}" height="${H}" fill="url(#bdGlow)"/>
     ${bunting}
-    ${balloon(W*0.115, H*0.205, minD*0.062, '#ff8fab', '#ffd3de')}
-    ${balloon(W*0.886, H*0.18, minD*0.056, '#74c4b8', '#cdeae5')}
-    ${balloon(W*0.93, H*0.34, minD*0.044, '#f4c64f', '#ffe9a8')}
+    ${balloon(W*0.10, H*0.34, minD*0.06, '#ff8fab', '#ffd3de')}
+    ${balloon(W*0.90, H*0.30, minD*0.055, '#74c4b8', '#cdeae5')}
+    ${balloon(W*0.93, H*0.47, minD*0.043, '#f4c64f', '#ffe9a8')}
     ${confettiPieces(W,H,44)}
   </svg>`;
 }
@@ -1838,7 +1856,10 @@ function buildBirthdayCard(s, spec){
   let msg = s.customMsg ? san(s.customMsg) : (T.birthday['msg'+s.tone] || T.birthday.msgWarm);
   if(!s.emoji) msg = stripEmoji(msg);
 
-  const pad = (fmt==='landscape') ? '18px 34px 46px' : '24px 34px 48px';
+  const scale = s.photoScale || 1;
+  const clampN = (v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+
+  const pad = (fmt==='landscape') ? '54px 34px 44px' : (fmt==='square' ? '58px 36px 46px' : '60px 40px 48px');
   const msgPx = fmt==='story'?17 : fmt==='square'?15.5 : 13.5;
   const flourish = '<span style="display:inline-block;width:26px;height:1.5px;background:var(--G);vertical-align:middle;margin:0 9px;opacity:.7;"></span>';
 
@@ -1853,7 +1874,8 @@ function buildBirthdayCard(s, spec){
   let centre;
   if(multi){
     const base = s.bdayCount<=2?120 : s.bdayCount===3?106 : s.bdayCount===4?96 : 88;
-    const cell = fmt==='landscape' ? Math.round(base*0.8) : base;
+    let cell = fmt==='landscape' ? Math.round(base*0.8) : base;
+    cell = clampN(Math.round(cell*scale), 70, fmt==='landscape'?124:152);
     const titlePx = fmt==='story'?36 : fmt==='square'?33 : 29;
     const cells = people.map(p=>`<div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:${cell+30}px;">
         ${photoFrame(p.src, cell, shape)}
@@ -1868,7 +1890,8 @@ function buildBirthdayCard(s, spec){
       </div>
       <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;gap:14px 20px;margin:14px 0;">${cells}</div>`;
   } else {
-    const size = fmt==='story'?198 : fmt==='square'?172 : 146;
+    let size = fmt==='story'?198 : fmt==='square'?172 : 150;
+    size = clampN(Math.round(size*scale), 110, fmt==='landscape'?202 : fmt==='square'?246 : 300);
     const namePx = fmt==='story'?37 : fmt==='square'?33 : 29;
     centre = `<div style="text-align:center;">
         <div style="font-size:9px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--G);margin-bottom:12px;">${flourish}Happy Birthday${flourish}</div>
@@ -2286,6 +2309,21 @@ btnExportRos.onclick=()=>{
   const a=document.createElement('a'); a.href=url; a.download='AIS-roster-'+todayStr()+'.csv'; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1500); toast_('Roster exported as CSV.','ok');
 };
+{ const bsSample=$('btnSampleRos');
+  if(bsSample) bsSample.onclick=()=>{
+    const rows=[
+      ['Name','Department','DOB (YYYY-MM-DD)','Joining Date (YYYY-MM-DD)'],
+      ['Asha Rao','Sales - West','1992-08-15','2019-04-01'],
+      ['Ravi Kumar','Marketing','1988-11-23','2021-01-10'],
+      ['Meena Nair','HR','1995-03-07','2023-06-20']
+    ];
+    const csv=rows.map(r=>r.map(v=>/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v).join(',')).join('\n');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    const a=document.createElement('a'); a.href=url; a.download='AIS-roster-sample.csv'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    toast_('Sample CSV downloaded — fill it in, then Import.','ok');
+  };
+}
 btnBatchToday.onclick=async()=>{
   const todays=getCelebrations(7).filter(c=>c.daysUntil===0);
   if(!todays.length){ toast_('No celebrations today.'); return; }
@@ -2312,6 +2350,7 @@ function onOccasionChange(){
   grpBdayMult.style.display = (occ==='birthday') ? '' : 'none';
   grpBdayPersons.style.display = (occ==='birthday') ? '' : 'none';
   const gps=$('grpPhotoShape'); if(gps) gps.style.display = (occ==='birthday') ? '' : 'none';
+  const gpz=$('grpPhotoSize'); if(gpz) gpz.style.display = (occ==='birthday') ? '' : 'none';
   if(occ==='birthday') buildBdayPersonFields(parseInt(fBdayMult.value,10)||1);
   else grpBdayPersons.innerHTML='';
 }
@@ -2335,6 +2374,9 @@ function switchTab(name){
   [].forEach.call(document.querySelectorAll('#pshapeBar .seg-btn'),x=>x.classList.toggle('on',x===b));
   refreshPreview();
 });
+(function(){ const sl=$('fPhotoSize'), lab=$('psizeVal');
+  if(sl) sl.addEventListener('input',()=>{ photoScale=parseFloat(sl.value)||1; LS.set('hrc_pscale',String(photoScale)); if(lab) lab.textContent=Math.round(photoScale*100)+'%'; refreshPreview(); });
+})();
 
 fAccent.oninput=()=>{ accentColor=fAccent.value; LS.set('hrc_accent',accentColor); applyAccent(); refreshPreview(); };
 btnAccentReset.onclick=()=>{ accentColor=''; LS.del('hrc_accent'); applyAccent(); refreshPreview(); toast_('Accent reset to theme default.'); };
@@ -2370,6 +2412,7 @@ function init(){
   if(logoB64) applyLogo(); else tryAutoLoadLogo(0);
   onOccasionChange();
   [].forEach.call(document.querySelectorAll('#pshapeBar .seg-btn'),b=>b.classList.toggle('on',b.dataset.shape===photoShape));
+  { const sl=$('fPhotoSize'), lab=$('psizeVal'); if(sl) sl.value=String(photoScale); if(lab) lab.textContent=Math.round(photoScale*100)+'%'; }
   renderChips(); renderRoster(); renderCelebrations(); renderHist();
   updateCounter();
   renderPreview();
